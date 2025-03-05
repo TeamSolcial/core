@@ -6,14 +6,47 @@ declare_id!("71WNuqD9qFJbo8ZyjkSg7GHL866PAfxFZNAEW3uisZEX");
 pub mod sola_table {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        msg!("Greetings from: {:?}", ctx.program_id);
+    pub fn create_meetup(
+        ctx: Context<CreateMeetup>,
+        title: String,
+        description: String,
+        max_participants: u8,
+        country: String,
+        city: String,
+        location: String,
+        price: u64,
+        date: i64,
+        category: String,
+        image_url: String,
+    ) -> Result<()> {
+        let meetup = &mut ctx.accounts.meetup;
+        let organizer = &ctx.accounts.organizer;
+
+        meetup.organizer = organizer.key();
+        meetup.title = title;
+        meetup.description = description;
+        meetup.max_participants = max_participants;
+        meetup.country = country;
+        meetup.city = city;
+        meetup.location = location;
+        meetup.price = price;
+        meetup.date = date;
+        meetup.category = category;
+        meetup.image_url = image_url;
+        meetup.current_participants = 0;
+
         Ok(())
     }
 }
 
 #[derive(Accounts)]
-pub struct Initialize {}
+pub struct CreateMeetup<'info> {
+    #[account(init, payer = organizer, space = Meetup::LEN)]
+    pub meetup: Account<'info, Meetup>,
+    #[account(mut)]
+    pub organizer: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
 
 #[account]
 pub struct Meetup {
