@@ -11,7 +11,7 @@ sola_table = "GdFRCmL2NYrB42712pU45t8C9Uj1nKLYKzg8NjkrsPoK"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

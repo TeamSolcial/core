@@ -1,5 +1,15 @@
 use anchor_lang::prelude::*;
 
+// 에러 코드 정의
+#[error_code]
+pub enum ErrorCode {
+    #[msg("The meetup is full")]
+    MeetupFull,
+
+    #[msg("The meetup date has passed")]
+    MeetupExpired,
+}
+
 // Meetup 구조체 정의
 #[account]
 pub struct Meetup {
@@ -43,6 +53,17 @@ pub struct CreateMeetup<'info> {
     pub system_program: Program<'info, System>,
 }
 
+// JoinMeetup 컨텍스트 정의
+#[derive(Accounts)]
+pub struct JoinMeetup<'info> {
+    #[account(
+        mut,
+        constraint = meetup.current_participants < meetup.max_participants @ ErrorCode::MeetupFull,
+    )]
+    pub meetup: Account<'info, Meetup>,
+    pub participant: Signer<'info>,
+}
+
 // create_meetup 함수 구현
 pub fn create_meetup(
     ctx: Context<CreateMeetup>,
@@ -72,6 +93,22 @@ pub fn create_meetup(
     meetup.category = category;
     meetup.image_url = image_url;
     meetup.current_participants = 0;
+
+    Ok(())
+}
+
+// join_meetup 함수 구현
+pub fn join_meetup(ctx: Context<JoinMeetup>) -> Result<()> {
+    let meetup = &mut ctx.accounts.meetup;
+
+    // 모임 날짜가 지났는지 확인
+    let current_time = Clock::get()?.unix_timestamp;
+    if current_time > meetup.date {
+        return Err(error!(ErrorCode::MeetupExpired));
+    }
+
+    // 참가자 수 증가
+    meetup.current_participants += 1;
 
     Ok(())
 }

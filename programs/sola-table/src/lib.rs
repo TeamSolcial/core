@@ -30,4 +30,8 @@ pub mod sola_table {
             country, city, location, price, date, category, image_url
         )
     }
+
+    pub fn join_meetup(ctx: Context<JoinMeetup>) -> Result<()> {
+        contract::meetup::join_meetup(ctx)
+    }
 }
