@@ -6,7 +6,7 @@ pub mod contract;
 // 필요한 타입 재내보내기
 pub use crate::contract::table::*;
 
-declare_id!("GdFRCmL2NYrB42712pU45t8C9Uj1nKLYKzg8NjkrsPoK");
+declare_id!("8pWTbsckvHvvRN71PZ4rV2y3kexmdgRgoxgPbWYRVxsi");
 
 #[program]
 pub mod sola_table {
