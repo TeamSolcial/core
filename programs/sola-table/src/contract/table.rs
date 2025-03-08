@@ -1,13 +1,16 @@
 use anchor_lang::prelude::*;
 
-// 에러 코드 정의
+// Add new error codes
 #[error_code]
 pub enum ErrorCode {
     #[msg("The table is full")]
     TableFull,
-
     #[msg("The table date has passed")]
     TableExpired,
+    #[msg("Already joined this table")]
+    AlreadyJoined,
+    #[msg("Organizer cannot join their own table")]
+    OrganizerCannotJoin,
 }
 
 // Table 구조체 정의
@@ -97,12 +100,21 @@ pub fn create_table(
     Ok(())
 }
 
-// join_table 함수 구현
 pub fn join_table(ctx: Context<JoinTable>) -> Result<()> {
     let table = &mut ctx.accounts.table;
     let participant = &ctx.accounts.participant;
 
-    // 모임 날짜가 지났는지 확인
+    // Check if participant is the organizer
+    if participant.key() == table.organizer {
+        return Err(error!(ErrorCode::OrganizerCannotJoin));
+    }
+
+    // Check if already joined
+    if table.participants.contains(&participant.key()) {
+        return Err(error!(ErrorCode::AlreadyJoined));
+    }
+
+    // Check expiration
     let current_time = Clock::get()?.unix_timestamp;
     if current_time > table.date {
         return Err(error!(ErrorCode::TableExpired));

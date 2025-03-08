@@ -44,8 +44,7 @@ describe("sola-table", () => {
         )
         .accounts({
           table: tableKeypair.publicKey,
-          organizer: provider.publicKey,
-          systemProgram: anchor.web3.SystemProgram.programId,
+          organizer: provider.publicKey
         })
         .signers([tableKeypair])
         .rpc();
@@ -107,8 +106,7 @@ describe("sola-table", () => {
         )
         .accounts({
           table: fullTableKeypair.publicKey,
-          organizer: provider.publicKey,
-          systemProgram: anchor.web3.SystemProgram.programId,
+          organizer: provider.publicKey
         })
         .signers([fullTableKeypair])
         .rpc();
@@ -162,8 +160,7 @@ describe("sola-table", () => {
         )
         .accounts({
           table: expiredTableKeypair.publicKey,
-          organizer: provider.publicKey,
-          systemProgram: anchor.web3.SystemProgram.programId,
+          organizer: provider.publicKey
         })
         .signers([expiredTableKeypair])
         .rpc();
