@@ -1,1 +1,1 @@
-pub mod meetup;
+pub mod table;

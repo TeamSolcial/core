@@ -10,14 +10,14 @@ describe("sola-table", () => {
 
   const program = anchor.workspace.SolaTable as Program<SolaTable>;
   const provider = anchor.getProvider();
-  let meetupKeypair: anchor.web3.Keypair;
+  let tableKeypair: anchor.web3.Keypair;
 
-  it("Create a new meetup", async () => {
-    // Generate a new keypair for the meetup account
-    meetupKeypair = anchor.web3.Keypair.generate();
+  it("Create a new table", async () => {
+    // Generate a new keypair for the table account
+    tableKeypair = anchor.web3.Keypair.generate();
 
-    // Meetup data
-    const title = "Solana Developer Meetup";
+    // Table data
+    const title = "Solana Developer Table";
     const description = "Join us for an exciting Solana development workshop!";
     const maxParticipants = 20;
     const country = "South Korea";
@@ -26,11 +26,11 @@ describe("sola-table", () => {
     const price = new anchor.BN(10_000_000); // 10 STT (10 * 10^6)
     const date = new anchor.BN(Date.now() / 1000 + 86400); // 내일 (24시간 후)
     const category = "Technology";
-    const imageUrl = "https://example.com/meetup-image.jpg";
+    const imageUrl = "https://example.com/table-image.jpg";
 
-    // Create the meetup
+    // Create the table
     await program.methods
-        .createMeetup(
+        .createTable(
             title,
             description,
             maxParticipants,
@@ -43,58 +43,59 @@ describe("sola-table", () => {
             imageUrl
         )
         .accounts({
-          meetup: meetupKeypair.publicKey,
+          table: tableKeypair.publicKey,
           organizer: provider.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
-        .signers([meetupKeypair])
+        .signers([tableKeypair])
         .rpc();
 
-    // Fetch the meetup account
-    const meetupAccount = await program.account.meetup.fetch(meetupKeypair.publicKey);
+    // Fetch the table account
+    const tableAccount = await program.account.table.fetch(tableKeypair.publicKey);
 
     // Verify all fields
-    expect(meetupAccount.organizer.toString()).to.equal(provider.publicKey.toString());
-    expect(meetupAccount.title).to.equal(title);
-    expect(meetupAccount.description).to.equal(description);
-    expect(meetupAccount.maxParticipants).to.equal(maxParticipants);
-    expect(meetupAccount.currentParticipants).to.equal(0);
-    expect(meetupAccount.country).to.equal(country);
-    expect(meetupAccount.city).to.equal(city);
-    expect(meetupAccount.location).to.equal(location);
-    expect(meetupAccount.price.toString()).to.equal(price.toString());
-    expect(meetupAccount.date.toString()).to.equal(date.toString());
-    expect(meetupAccount.category).to.equal(category);
-    expect(meetupAccount.imageUrl).to.equal(imageUrl);
+    expect(tableAccount.organizer.toString()).to.equal(provider.publicKey.toString());
+    expect(tableAccount.title).to.equal(title);
+    expect(tableAccount.description).to.equal(description);
+    expect(tableAccount.maxParticipants).to.equal(maxParticipants);
+    expect(tableAccount.participants.length).to.equal(0);
+    expect(tableAccount.country).to.equal(country);
+    expect(tableAccount.city).to.equal(city);
+    expect(tableAccount.location).to.equal(location);
+    expect(tableAccount.price.toString()).to.equal(price.toString());
+    expect(tableAccount.date.toString()).to.equal(date.toString());
+    expect(tableAccount.category).to.equal(category);
+    expect(tableAccount.imageUrl).to.equal(imageUrl);
   });
 
-  it("Join an existing meetup", async () => {
-    // 미팅이 생성되어 있어야 함 (이전 테스트에서 생성됨)
+  it("Join an existing table", async () => {
+    // 테이블이 생성되어 있어야 함 (이전 테스트에서 생성됨)
     // 참가 요청
     await program.methods
-        .joinMeetup()
+        .joinTable()
         .accounts({
-          meetup: meetupKeypair.publicKey,
+          table: tableKeypair.publicKey,
           participant: provider.publicKey,
         })
         .rpc();
 
-    // 미팅 계정 가져오기
-    const meetupAccount = await program.account.meetup.fetch(meetupKeypair.publicKey);
+    // 테이블 계정 가져오기
+    const tableAccount = await program.account.table.fetch(tableKeypair.publicKey);
 
-    // 참가자 수가 1 증가했는지 확인
-    expect(meetupAccount.currentParticipants).to.equal(1);
+    // 참가자가 추가되었는지 확인
+    expect(tableAccount.participants.length).to.equal(1);
+    expect(tableAccount.participants[0].toString()).to.equal(provider.publicKey.toString());
   });
 
-  it("Fails to join a full meetup", async () => {
-    // 가득 찬 미팅을 위한 새 키페어 생성
-    const fullMeetupKeypair = anchor.web3.Keypair.generate();
+  it("Fails to join a full table", async () => {
+    // 가득 찬 테이블을 위한 새 키페어 생성
+    const fullTableKeypair = anchor.web3.Keypair.generate();
 
-    // 참가자 최대 수가 1인 미팅 생성
+    // 참가자 최대 수가 1인 테이블 생성
     await program.methods
-        .createMeetup(
-            "Small Meetup",
-            "A very small meetup with limited capacity",
+        .createTable(
+            "Small Table",
+            "A very small table with limited capacity",
             1, // maxParticipants = 1
             "South Korea",
             "Seoul",
@@ -102,21 +103,21 @@ describe("sola-table", () => {
             new anchor.BN(10_000_000),
             new anchor.BN(Date.now() / 1000 + 86400),
             "Technology",
-            "https://example.com/small-meetup.jpg"
+            "https://example.com/small-table.jpg"
         )
         .accounts({
-          meetup: fullMeetupKeypair.publicKey,
+          table: fullTableKeypair.publicKey,
           organizer: provider.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
-        .signers([fullMeetupKeypair])
+        .signers([fullTableKeypair])
         .rpc();
 
     // 첫 번째 참가자 등록 (성공해야 함)
     await program.methods
-        .joinMeetup()
+        .joinTable()
         .accounts({
-          meetup: fullMeetupKeypair.publicKey,
+          table: fullTableKeypair.publicKey,
           participant: provider.publicKey,
         })
         .rpc();
@@ -124,32 +125,32 @@ describe("sola-table", () => {
     // 두 번째 참가자 등록 시도 (실패해야 함)
     try {
       await program.methods
-          .joinMeetup()
+          .joinTable()
           .accounts({
-            meetup: fullMeetupKeypair.publicKey,
+            table: fullTableKeypair.publicKey,
             participant: provider.publicKey,
           })
           .rpc();
 
       // 여기까지 실행되면 테스트 실패
-      assert.fail("Expected to throw an error when joining a full meetup");
+      assert.fail("Expected to throw an error when joining a full table");
     } catch (error) {
-      // 에러가 MeetupFull 인지 확인
-      expect(error.message).to.include("The meetup is full");
+      // 에러가 TableFull 인지 확인
+      expect(error.message).to.include("The table is full");
     }
   });
 
-  it("Fails to join an expired meetup", async () => {
-    // 만료된 미팅을 위한 새 키페어 생성
-    const expiredMeetupKeypair = anchor.web3.Keypair.generate();
+  it("Fails to join an expired table", async () => {
+    // 만료된 테이블을 위한 새 키페어 생성
+    const expiredTableKeypair = anchor.web3.Keypair.generate();
 
-    // 과거 날짜로 미팅 생성
+    // 과거 날짜로 테이블 생성
     const pastDate = new anchor.BN(Date.now() / 1000 - 86400); // 하루 전
 
     await program.methods
-        .createMeetup(
-            "Past Meetup",
-            "This meetup already happened",
+        .createTable(
+            "Past Table",
+            "This table already happened",
             10,
             "South Korea",
             "Seoul",
@@ -157,31 +158,31 @@ describe("sola-table", () => {
             new anchor.BN(10_000_000),
             pastDate,
             "Technology",
-            "https://example.com/past-meetup.jpg"
+            "https://example.com/past-table.jpg"
         )
         .accounts({
-          meetup: expiredMeetupKeypair.publicKey,
+          table: expiredTableKeypair.publicKey,
           organizer: provider.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
-        .signers([expiredMeetupKeypair])
+        .signers([expiredTableKeypair])
         .rpc();
 
-    // 만료된 미팅 참가 시도 (실패해야 함)
+    // 만료된 테이블 참가 시도 (실패해야 함)
     try {
       await program.methods
-          .joinMeetup()
+          .joinTable()
           .accounts({
-            meetup: expiredMeetupKeypair.publicKey,
+            table: expiredTableKeypair.publicKey,
             participant: provider.publicKey,
           })
           .rpc();
 
       // 여기까지 실행되면 테스트 실패
-      assert.fail("Expected to throw an error when joining an expired meetup");
+      assert.fail("Expected to throw an error when joining an expired table");
     } catch (error) {
-      // 에러가 MeetupExpired 인지 확인
-      expect(error.message).to.include("The meetup date has passed");
+      // 에러가 TableExpired 인지 확인
+      expect(error.message).to.include("The table date has passed");
     }
   });
 });
