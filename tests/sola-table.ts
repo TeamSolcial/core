@@ -12,6 +12,9 @@ describe("sola-table", () => {
   const provider = anchor.getProvider();
   let tableKeypair: anchor.web3.Keypair;
 
+  // Create a new wallet for participant tests
+  const participantKeypair = anchor.web3.Keypair.generate();
+
   it("Create a new table", async () => {
     // Generate a new keypair for the table account
     tableKeypair = anchor.web3.Keypair.generate();
@@ -68,34 +71,30 @@ describe("sola-table", () => {
   });
 
   it("Join an existing table", async () => {
-    // 테이블이 생성되어 있어야 함 (이전 테스트에서 생성됨)
-    // 참가 요청
     await program.methods
         .joinTable()
         .accounts({
           table: tableKeypair.publicKey,
-          participant: provider.publicKey,
+          participant: participantKeypair.publicKey, // Use different wallet
         })
+        .signers([participantKeypair])
         .rpc();
 
-    // 테이블 계정 가져오기
     const tableAccount = await program.account.table.fetch(tableKeypair.publicKey);
-
-    // 참가자가 추가되었는지 확인
     expect(tableAccount.participants.length).to.equal(1);
-    expect(tableAccount.participants[0].toString()).to.equal(provider.publicKey.toString());
+    expect(tableAccount.participants[0].toString()).to.equal(participantKeypair.publicKey.toString());
   });
 
   it("Fails to join a full table", async () => {
-    // 가득 찬 테이블을 위한 새 키페어 생성
     const fullTableKeypair = anchor.web3.Keypair.generate();
+    const participant1 = anchor.web3.Keypair.generate();
+    const participant2 = anchor.web3.Keypair.generate();
 
-    // 참가자 최대 수가 1인 테이블 생성
     await program.methods
         .createTable(
             "Small Table",
             "A very small table with limited capacity",
-            1, // maxParticipants = 1
+            1,
             "South Korea",
             "Seoul",
             "Gangnam",
@@ -111,39 +110,36 @@ describe("sola-table", () => {
         .signers([fullTableKeypair])
         .rpc();
 
-    // 첫 번째 참가자 등록 (성공해야 함)
+    // First participant joins
     await program.methods
         .joinTable()
         .accounts({
           table: fullTableKeypair.publicKey,
-          participant: provider.publicKey,
+          participant: participant1.publicKey,
         })
+        .signers([participant1])
         .rpc();
 
-    // 두 번째 참가자 등록 시도 (실패해야 함)
+    // Second participant tries to join
     try {
       await program.methods
           .joinTable()
           .accounts({
             table: fullTableKeypair.publicKey,
-            participant: provider.publicKey,
+            participant: participant2.publicKey,
           })
+          .signers([participant2])
           .rpc();
-
-      // 여기까지 실행되면 테스트 실패
-      assert.fail("Expected to throw an error when joining a full table");
-    } catch (error) {
-      // 에러가 TableFull 인지 확인
-      expect(error.message).to.include("The table is full");
+      assert.fail("Expected to throw TableFull error");
+    } catch (error: any) {
+      expect(error.error.errorCode.code).to.equal("TableFull");
     }
   });
 
   it("Fails to join an expired table", async () => {
-    // 만료된 테이블을 위한 새 키페어 생성
     const expiredTableKeypair = anchor.web3.Keypair.generate();
-
-    // 과거 날짜로 테이블 생성
-    const pastDate = new anchor.BN(Date.now() / 1000 - 86400); // 하루 전
+    const participant = anchor.web3.Keypair.generate();
+    const pastDate = new anchor.BN(Date.now() / 1000 - 86400);
 
     await program.methods
         .createTable(
@@ -165,21 +161,105 @@ describe("sola-table", () => {
         .signers([expiredTableKeypair])
         .rpc();
 
-    // 만료된 테이블 참가 시도 (실패해야 함)
     try {
       await program.methods
           .joinTable()
           .accounts({
             table: expiredTableKeypair.publicKey,
-            participant: provider.publicKey,
+            participant: participant.publicKey,
           })
+          .signers([participant])
           .rpc();
+      assert.fail("Expected to throw TableExpired error");
+    } catch (error: any) {
+      expect(error.error.errorCode.code).to.equal("TableExpired");
+    }
+  });
 
-      // 여기까지 실행되면 테스트 실패
-      assert.fail("Expected to throw an error when joining an expired table");
-    } catch (error) {
-      // 에러가 TableExpired 인지 확인
-      expect(error.message).to.include("The table date has passed");
+  it("Prevents organizer from joining their own table", async () => {
+    const table = anchor.web3.Keypair.generate();
+    
+    await program.methods
+      .createTable(
+        "Test Table",
+        "Description",
+        5,
+        "Korea",
+        "Seoul",
+        "Location",
+        new anchor.BN(1000),
+        new anchor.BN(Date.now() / 1000 + 86400),
+        "Study",
+        "image.url"
+      )
+      .accounts({
+        table: table.publicKey,
+        organizer: provider.publicKey
+      })
+      .signers([table])
+      .rpc();
+
+    try {
+      await program.methods
+        .joinTable()
+        .accounts({
+          table: table.publicKey,
+          participant: provider.publicKey,
+        })
+        .rpc();
+      assert.fail("Expected to throw OrganizerCannotJoin error");
+    } catch (error: any) {
+      expect(error.error.errorCode.code).to.equal("OrganizerCannotJoin");
+    }
+  });
+
+  it("Prevents duplicate joins", async () => {
+    const table = anchor.web3.Keypair.generate();
+    const participant = anchor.web3.Keypair.generate();
+    
+    await program.methods
+      .createTable(
+        "Test Table",
+        "Description",
+        5,
+        "Korea",
+        "Seoul",
+        "Location",
+        new anchor.BN(1000),
+        new anchor.BN(Date.now() / 1000 + 86400),
+        "Study",
+        "image.url"
+      )
+      .accounts({
+        table: table.publicKey,
+        organizer: provider.publicKey
+      })
+      .signers([table])
+      .rpc();
+
+    // First join
+    await program.methods
+      .joinTable()
+      .accounts({
+        table: table.publicKey,
+        participant: participant.publicKey,
+      })
+      .signers([participant])
+      .rpc();
+
+    // Try to join again
+    try {
+      await program.methods
+        .joinTable()
+        .accounts({
+          table: table.publicKey,
+          participant: participant.publicKey,
+        })
+        .signers([participant])
+        .rpc();
+      assert.fail("Expected to throw AlreadyJoined error");
+    } catch (error: any) {
+      expect(error.error.errorCode.code).to.equal("AlreadyJoined");
     }
   });
 });
